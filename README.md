@@ -2,8 +2,9 @@
 
 ## About ##
 
-Header only library for using Glo monitoring in C++. For more
-information on Glo see [here](https://github.com/andersroos/glo).
+C++ library for using Glo monitoring, the library is currently header
+only. For more information on Glo see
+[here](https://github.com/andersroos/glo).
 
 Features:
 
@@ -12,9 +13,7 @@ Features:
 Current source version is 0.0.0-dev.0 and this lib uses [semantic
 versioning](http://semver.org/).
 
-## Examples ##
-
-Basic usage example:
+## Usage Example ##
 
 ```c++
 #include <atomic>
@@ -29,7 +28,7 @@ int main()
    // Create a counter.
    std::atomic<uint32_t> count(0);
 
-   // Create status server.
+   // Create status server (letting the server select port).
    glo::status_server server;
 
    // Print bound port.
@@ -49,7 +48,7 @@ int main()
 }
 ```
 
-Fore more examples see [example dir](https://github.com/andersroos/glo-cpplib/examples) for usage examples.
+Fore more examples see example dir in source.
 
 ## API Doc ##
 
