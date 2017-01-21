@@ -10,7 +10,7 @@ Features:
 
 * Status server for exposing internal values.
 
-Current source version is 0.0.0-dev.0 and this lib uses [semantic
+Current source version is 0.0.0-dev.1 and this lib uses [semantic
 versioning](http://semver.org/).
 
 ## Usage Example ##
