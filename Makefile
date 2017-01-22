@@ -26,7 +26,7 @@ TEST_OBJS = \
 	test/group_format_test.o
 
 
-default: 
+default: examples test
 
 
 test: $(TEST_OBJS)

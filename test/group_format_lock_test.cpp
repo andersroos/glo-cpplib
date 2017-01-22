@@ -34,7 +34,8 @@ BOOST_AUTO_TEST_CASE(test_pointer_to_string_uses_format_while_locked_implementat
    group g(group_lock_test_mutex);
    g.add<decltype(&val), locking_formatter<decltype(&val)>>(&val, "", {}, 0, "");
    stringstream ss;
-   BOOST_CHECK_THROW(g.json_format_items(ss, ""), locked_exception);
+   const char* delimiter = "";
+   BOOST_CHECK_THROW(g.json_format_items(ss, "", delimiter), locked_exception);
 }
 
 BOOST_AUTO_TEST_CASE(test_pointer_to_uint32_uses_copy_while_locked_implementation)
@@ -43,7 +44,8 @@ BOOST_AUTO_TEST_CASE(test_pointer_to_uint32_uses_copy_while_locked_implementatio
    group g(group_lock_test_mutex);
    g.add<decltype(&val), locking_formatter<decltype(&val)>>(&val, "", {}, 0, "");
    stringstream ss;
-   g.json_format_items(ss, "");
+   const char* delimiter = "";
+   g.json_format_items(ss, "", delimiter);
 }
 
 BOOST_AUTO_TEST_CASE(test_ref_to_int64_uses_copy_while_locked_implementation)
@@ -52,7 +54,8 @@ BOOST_AUTO_TEST_CASE(test_ref_to_int64_uses_copy_while_locked_implementation)
    group g(group_lock_test_mutex);
    g.add<decltype(ref(val)), locking_formatter<decltype(ref(val))>>(ref(val), "", {}, 0, "");
    stringstream ss;
-   g.json_format_items(ss, "");
+   const char* delimiter = "";
+   g.json_format_items(ss, "", delimiter);
 }
 
 BOOST_AUTO_TEST_CASE(test_cref_to_bool_uses_copy_while_locked_implementation)
@@ -61,7 +64,8 @@ BOOST_AUTO_TEST_CASE(test_cref_to_bool_uses_copy_while_locked_implementation)
    group g(group_lock_test_mutex);
    g.add<decltype(cref(val)), locking_formatter<decltype(cref(val))>>(cref(val), "", {}, 0, "");
    stringstream ss;
-   g.json_format_items(ss, "");
+   const char* delimiter = "";
+   g.json_format_items(ss, "", delimiter);
 }
 
 BOOST_AUTO_TEST_CASE(test_pointer_to_atomic_uint8_uses_formaat_while_locked_implementation)
@@ -70,7 +74,8 @@ BOOST_AUTO_TEST_CASE(test_pointer_to_atomic_uint8_uses_formaat_while_locked_impl
    group g(group_lock_test_mutex);
    g.add<decltype(&val), locking_formatter<decltype(&val)>>(&val, "", {}, 0, "");
    stringstream ss;
-   BOOST_CHECK_THROW(g.json_format_items(ss, ""), locked_exception);
+   const char* delimiter = "";
+   BOOST_CHECK_THROW(g.json_format_items(ss, "", delimiter), locked_exception);
 }
  
 BOOST_AUTO_TEST_CASE(test_shared_ptr_to_int8_uses_copy_while_locked_implementation)
@@ -79,7 +84,8 @@ BOOST_AUTO_TEST_CASE(test_shared_ptr_to_int8_uses_copy_while_locked_implementati
    group g(group_lock_test_mutex);
    g.add<decltype(val), locking_formatter<decltype(val)>>(val, "", {}, 0, "");
    stringstream ss;
-   g.json_format_items(ss, "");
+   const char* delimiter = "";
+   g.json_format_items(ss, "", delimiter);
 }
 
 
