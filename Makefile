@@ -58,7 +58,7 @@ docker-pull:
 	docker pull -a $(DOCKER_USER)/glo
 
 docker-test:
-	docker run -v $(pwd):/src -i -t ygram/glo:cpplib-test /bin/sh -c 'cd /src && make clean && make -j  examples  test'
+	docker run -v $$(pwd):/src -i -t ygram/glo:cpplib-test /bin/sh -c 'cd /src && make clean && make -j  examples  test'
 
 .PHONY: depend default test examples clean todo
 
