@@ -1,6 +1,7 @@
 MAKEFILE_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 BASE_DIR := $(realpath $(CURDIR)/$(MAKEFILE_DIR))
 INCLUDE_DIR := $(BASE_DIR)/include
+DOCKER_USER := ygram
 
 #
 # Settings
@@ -47,8 +48,21 @@ todo:
 depend:
 	makedepend -Y -Iinclude test/*.cpp
 
+docker-build:
+	docker build dist/test -t $(DOCKER_USER)/glo:cpplib-test
+
+docker-push:
+	docker push $(DOCKER_USER)/glo:cpplib-test
+
+docker-pull:
+	docker pull -a $(DOCKER_USER)/glo
+
+docker-test:
+	docker run -v $(pwd):/src -i -t ygram/glo:cpplib-test /bin/sh -c 'cd /src && make clean && make -j  examples  test'
+
 .PHONY: depend default test examples clean todo
 
 # DO NOT DELETE
 
 test/group_format_lock_test.o: include/glo/status.hpp include/glo/json.hpp
+test/group_format_test.o: include/glo/status.hpp include/glo/json.hpp

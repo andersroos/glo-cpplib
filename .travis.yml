@@ -1,0 +1,11 @@
+sudo: true
+
+services:
+  - docker
+  
+install:
+  - "make docker-pull"
+  
+script:
+  - "make docker-test"
+
