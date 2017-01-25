@@ -11,7 +11,7 @@ LDFLAGS = -lpthread
 
 all: $(EXAMPLES)
 
-%: %.cpp $(GLO_INCLUDE)/glo/status.hpp $(GLO_INCLUDE)/glo/json.hpp $(GLO_INCLUDE)/glo/status_server.hpp
+%: %.cpp $(GLO_INCLUDE)/glo/common.hpp $(GLO_INCLUDE)/glo/status_server.hpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
 clean:

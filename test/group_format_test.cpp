@@ -1,7 +1,8 @@
 #include <atomic>
 #include <boost/test/unit_test.hpp>
 #include <boost/throw_exception.hpp>
-#include "glo/status.hpp"
+
+#include <glo.hpp>
 
 using namespace glo;
 using namespace std;

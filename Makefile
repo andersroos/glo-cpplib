@@ -39,7 +39,7 @@ examples:
 
 clean:
 	make -C examples clean
-	\rm -f include/*.o run-tests
+	\rm -f include/*.o run-tests test/*.o
 
 todo:
 	@grep -irn todo | grep -v -E -e '(\.git|Makefile)' -e .idea | sort; echo ""
@@ -63,6 +63,3 @@ docker-test:
 .PHONY: depend default test examples clean todo
 
 # DO NOT DELETE
-
-test/group_format_lock_test.o: include/glo/status.hpp include/glo/json.hpp
-test/group_format_test.o: include/glo/status.hpp include/glo/json.hpp

@@ -3,11 +3,41 @@
 #include <sstream>
 #include <iomanip>
 #include <memory>
+#include <vector>
 
 namespace glo {
 
    //
-   // JSON helpers.
+   // Tags.
+   //
+   using tag_t = std::string;;
+   using tags_t = std::vector<tag_t>;
+   namespace tag {
+      static const tag_t COUNT("count");
+      static const tag_t SIZE("size");
+      static const tag_t LAST("last");
+      static const tag_t TOTAL("total");
+      static const tag_t MIN("min");
+      static const tag_t MAX("max");
+      static const tag_t CURRENT("current");
+      static const tag_t DURATION("duration");
+      static const tag_t TIME("time");
+   }
+
+   //
+   // Levels.
+   //
+   using level_t = uint32_t;
+   namespace level {
+      static const level_t HIGHEST = 0;
+      static const level_t HIGH = 1;
+      static const level_t MEDIUM = 2;
+      static const level_t LOW = 3;
+      static const level_t LOWEST = 4;
+   }
+
+   //
+   // JSON formatting.
    //
 
    //
@@ -53,6 +83,5 @@ namespace glo {
    {
       void operator()(std::ostream& os, const V& value) const { json_format(os, value); };
    };
-
    
 }
