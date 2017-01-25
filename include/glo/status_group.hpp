@@ -20,9 +20,9 @@ namespace glo {
    struct group
    {
       group() {}
-      group(std::string key_prefix) : _key_prefix(key_prefix) {};
-      group(std::shared_ptr<std::mutex> mutex) : _value_mutex(mutex) {};
-      group(std::string key_prefix, std::shared_ptr<std::mutex> mutex) : _key_prefix(key_prefix), _value_mutex(mutex) {}
+      group(const std::string& key_prefix) : _key_prefix(key_prefix) {};
+      group(const std::shared_ptr<std::mutex>& mutex) : _value_mutex(mutex) {};
+      group(const std::string& key_prefix, const std::shared_ptr<std::mutex>& mutex) : _key_prefix(key_prefix), _value_mutex(mutex) {}
 
       // TODO How JsonFormatter works is not optimal, maybe want to provide optional format function instead.
       
@@ -33,13 +33,13 @@ namespace glo {
       template<typename V, typename JsonFormatter = json_formatter<V> >
       void add(V val, std::string key, glo::tags_t tags, glo::level_t level, std::string desc);
 
-      // // Provide a callback for value V.
+      // TODO Provide a callback for value V.
       // template<typename V, typename JsonFormatter = json_formatter<V> >
       // void add_cb(std::function<V()> cb, glo::spec spec) {}
       
       // Add a group to this group, optionally providing a key prefix for all keys in the group.
-      inline void add_group(std::shared_ptr<group> group, std::string key_prefix);
-      inline void add_group(std::shared_ptr<group> group);
+      inline void add_group(const std::shared_ptr<group>& group, const std::string& key_prefix);
+      inline void add_group(const std::shared_ptr<group>& group);
       
       // Read values and format items in this group into the stream. Each key will have key_prefix prepended when
       // formatting. Each item will be formatted as comma separated json dicts but no enclosing [] or ,.
@@ -65,12 +65,10 @@ namespace glo {
       
       // Json format everything static in the item, from the known end of the key until the : before the item value.
       inline std::string format_item_spec(std::string key, glo::tags_t tags, glo::level_t level, std::string desc);
-      
+
+      // Key prefix for all groups and items added.
       std::string _key_prefix;
 
-      // TODO Make template to optionally use raw pointer instead of shared? Also for grops, really don't like the world
-      // of forced heap allocation.
-      
       // Optional mutex for values, shared with application code.
       std::shared_ptr<std::mutex> _value_mutex;
 
@@ -214,12 +212,12 @@ namespace glo {
       _values.emplace_back(std::make_unique<object_value<V, JsonFormatter>>(val, item_spec));
    }
    
-   void group::add_group(std::shared_ptr<group> group)
+   void group::add_group(const std::shared_ptr<group>& group)
    {
       add_group(group, "");
    }
    
-   void group::add_group(std::shared_ptr<group> group, std::string key_prefix)
+   void group::add_group(const std::shared_ptr<group>& group, const std::string& key_prefix)
    {
       std::lock_guard<std::mutex> lock(_mutex);
       _groups.emplace_back(make_pair(key_prefix, group));
