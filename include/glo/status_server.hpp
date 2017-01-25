@@ -442,7 +442,7 @@ namespace glo {
       }
    }
 
-   std::string error_response(std::string message)
+   inline std::string error_response(std::string message)
    {
       return "HTTP/1.1 400 " + message + "\r\n\r\n";
    }
