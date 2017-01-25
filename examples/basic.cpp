@@ -11,7 +11,7 @@ int main()
    std::atomic<uint32_t> count(0);
 
    // Create status server.
-   glo::status_server server;
+   glo::http_status_server server;
 
    // Print bound port.
    std::cerr << "Started server on port " << server.port() << std::endl;

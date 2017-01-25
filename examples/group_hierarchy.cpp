@@ -31,7 +31,7 @@ int main()
    handler_group->add_group(cache_group2);
 
    // Create status server which is also a group.
-   glo::status_server server;
+   glo::http_status_server server;
 
    // Add groups.
    server.add_group(handler_group);
