@@ -3,7 +3,6 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <iostream>
 #include <memory>
@@ -35,7 +34,8 @@ namespace glo {
    struct http_status_server : public group
    {
       // Create the server, which is also a group. For parameters key_prefix and mutexe see group doc. Set the port the
-      // server should listen to with port, 0 for the first available port from 22200 to 22240
+      // server should listen to with port, 0 for the first available port from 22200 to 22240. Throws glo::os_error on
+      // failed system calls or if no free port is found.
       http_status_server() : _port(0) { bind(); }
       http_status_server(uint16_t port) : _port(port) { bind(); }
       http_status_server(std::string key_prefix, uint16_t port) : group(key_prefix), _port(port) { bind(); }
@@ -47,14 +47,15 @@ namespace glo {
       inline uint16_t port();
       
       // Serve one request and return or return after timeout seconds (0 for no timeout) or an unspecified time after
-      // stop is called.
+      // stop is called. Throws glo::os_error on failed system calls.
       inline void serve_once(double timeout=0); // TODO
       
       // Serve requests forever. Only returning an unspecified time after stop is called. Sleep sleep_time seconds
-      // between each request, this works as a throttling mecanism.
+      // between each request, this works as a throttling mecanism. Throws glo::os_error on failed system calls.
       inline void serve_forever(double sleep_time=0.05);
       
-      // Start a new thread responding to requests. The thread will be stopped and joined if stop is called.
+      // Start a new thread responding to requests. The thread will be stopped and joined if stop is called. Throws
+      // glo::os_error on failed system calls.
       inline void start(double sleep_time=0.05);
       
       // Stop serving. If a thread was started with start it will block until the thread is stopped, otherwise it will
@@ -80,26 +81,25 @@ namespace glo {
    // Implementation.
    //
    
-   // TODO Implement error handling, exceptions, error codes or both?
    void http_status_server::bind()
    {
       std::lock_guard<std::mutex> lock(_mutex);
       
       _socket = socket(AF_INET6, SOCK_STREAM, 0);
       if (_socket == -1) {
-         throw std::runtime_error("failed to create socket");
+         throw os_error("failed to create socket");
       }
 
       int val;
       val = fcntl(_socket, F_GETFL, 0);
       if (fcntl(_socket, F_SETFL, val | O_NONBLOCK) == -1) {
          _socket = -1;
-         throw std::runtime_error("failed to set socket to non blocking");
+         throw os_error("failed to set socket to non blocking");
       }
       
       int opt = 1;
       if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
-         throw std::runtime_error("failed to set socket options");
+         throw os_error("failed to set socket options");
       }
 
       uint16_t port_min = _port ? _port : 22200;
@@ -108,7 +108,7 @@ namespace glo {
       for (_port = port_min; true; ++_port) {
          
          if (_port > port_max) {
-            throw std::runtime_error("could not bind socket on any port from port TODO to TODO.");
+            throw os_error("could not bind socket on any port from port TODO to TODO.");
          }
          
          struct sockaddr_in6 addr;
@@ -121,13 +121,15 @@ namespace glo {
          }
          else {
             if (EADDRINUSE != errno) {
-               throw std::runtime_error("could not bind socket on port"); // TODO _port
+               std::stringstream ss;
+               ss << "could not bind socket on port " << uint32_t(_port); 
+               throw os_error(ss.str());
             }
          }
       }
 
       if (listen(_socket, 32) == -1) {
-         throw std::runtime_error("could not listen to socket");
+         throw os_error("could not listen to socket");
       }
    }
    
@@ -142,38 +144,40 @@ namespace glo {
       // TODO Implement read timeout and accept timeout.
       char buf[2048];
       int server = -1;
-         
+
       while (true) {
          {
             std::lock_guard<std::mutex> lock(_mutex);
             server = accept(_socket, NULL, NULL);
          }
+         
          if (server == -1) {
             if (errno == EAGAIN) {
                usleep(std::max<uint64_t>(200, sleep_time * 2e5));
                continue;
             }
-            
-            throw std::runtime_error("error accepting connection"); // TODO errno
-         }
-            
-         std::stringstream data;
-         ssize_t received;
-         while ((received = recv(server, buf, sizeof(buf), 0)) > 0) {
-            data.write(buf, received);
-            data.seekg(-4, data.end);
-            data.read(buf, 4);
-            if (strncmp("\r\n\r\n", buf, 4) == 0) {
-               std::string response = do_http(data);
-         
-               if (send(server, response.c_str(), response.size(), 0) == -1) {
-                  // Failed to send data, just ignore this error.
-               }
-               break;
-            }
+            throw std::runtime_error("error accepting connection");
          }
 
-         close(server); // TODO Make sure closed on any exception.
+         {
+            close_guard server_close(server);
+         
+            std::stringstream data;
+            ssize_t received;
+            while ((received = recv(server, buf, sizeof(buf), 0)) > 0) {
+               data.write(buf, received);
+               data.seekg(-4, data.end);
+               data.read(buf, 4);
+               if (strncmp("\r\n\r\n", buf, 4) == 0) {
+                  std::string response = do_http(data);
+                  
+                  if (send(server, response.c_str(), response.size(), 0) == -1) {
+                     // Failed to send data, just ignore this error.
+                  }
+                  break;
+               }
+            }
+         }
 
          usleep(uint64_t(sleep_time * 1e6));
       }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unistd.h>
+
 #include <sstream>
 #include <iomanip>
 #include <memory>
@@ -7,6 +9,16 @@
 
 namespace glo {
 
+   //
+   // Exceptions.
+   //
+
+   // Thrown on failed system calls, check errno for details.
+   struct os_error : public std::runtime_error {
+      os_error(const char* msg) : std::runtime_error(msg) {}
+      os_error(const std::string& msg) : std::runtime_error(msg) {}
+   };
+   
    //
    // Tags.
    //
@@ -35,11 +47,13 @@ namespace glo {
       static const level_t LOW = 3;
       static const level_t LOWEST = 4;
    }
-
+ 
    //
    // JSON formatting.
    //
 
+ 
+   
    //
    // Escape chars that needs escaping (\, " and control chars). Assuming string is already utf-8 encoded, nothing more
    // should be needed since json is encoded utf-8 by default.
@@ -82,6 +96,17 @@ namespace glo {
    template<typename V> struct json_formatter
    {
       void operator()(std::ostream& os, const V& value) const { json_format(os, value); };
+   };
+
+   //
+   // Utils.
+   //
+
+   // RAII close of file descriptor.
+   struct close_guard {
+      int fd;
+      close_guard(int fd) : fd(fd) {}
+      ~close_guard() { if (fd != -1) close(fd); }
    };
    
 }
