@@ -1,5 +1,5 @@
 
-EXAMPLES = basic group_hierarchy
+EXAMPLES = main basic group_hierarchy
 
 GLO_INCLUDE = ../include
 
