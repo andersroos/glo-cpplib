@@ -80,6 +80,15 @@ namespace glo {
    //
    // Implementation.
    //
+
+   void set_non_blocking(int sock)
+   {
+      int val = fcntl(sock, F_GETFL, 0);
+      if (fcntl(sock, F_SETFL, val | O_NONBLOCK) == -1) {
+         sock = -1;
+         throw os_error("failed to set socket to non blocking");
+      }
+   }
    
    void http_status_server::bind()
    {
@@ -90,12 +99,7 @@ namespace glo {
          throw os_error("failed to create socket");
       }
 
-      int val;
-      val = fcntl(_socket, F_GETFL, 0);
-      if (fcntl(_socket, F_SETFL, val | O_NONBLOCK) == -1) {
-         _socket = -1;
-         throw os_error("failed to set socket to non blocking");
-      }
+      set_non_blocking(_socket);
       
       int opt = 1;
       if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
@@ -163,10 +167,22 @@ namespace glo {
 
          {
             close_guard server_close(server);
-         
+
+            set_non_blocking(server);
+            
             std::stringstream data;
             ssize_t received;
-            while ((received = recv(server, buf, sizeof(buf), 0)) > 0) {
+            while (true) {
+               received = recv(server, buf, sizeof(buf), 0);
+               if (received == -1) {
+                  if (errno == EAGAIN) {
+                     // TODO Close connection on timeout.
+                     usleep(std::max<uint64_t>(20, sleep_time * 2e5));
+                     continue;
+                  }
+                  // Failed to receive data, just ignore this error.
+                  break;
+               }
                data.write(buf, received);
                data.seekg(-4, data.end);
                data.read(buf, 4);
