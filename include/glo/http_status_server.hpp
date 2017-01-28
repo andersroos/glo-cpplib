@@ -108,7 +108,9 @@ namespace glo {
       for (_port = port_min; true; ++_port) {
          
          if (_port > port_max) {
-            throw os_error("could not bind socket on any port from port TODO to TODO.");
+            std::stringstream ss;
+            ss << "could not bind socket on any port from port " << uint32_t(port_max) << " to " << uint32_t(port_max);
+            throw os_error(ss.str());
          }
          
          struct sockaddr_in6 addr;
