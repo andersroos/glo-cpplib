@@ -81,7 +81,7 @@ namespace glo {
    // Implementation.
    //
 
-   void set_non_blocking(int sock)
+   inline void set_non_blocking(int sock)
    {
       int val = fcntl(sock, F_GETFL, 0);
       if (fcntl(sock, F_SETFL, val | O_NONBLOCK) == -1) {
