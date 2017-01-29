@@ -6,4 +6,6 @@ RUN apt-get update && apt-get install -y \
     g++ \
     make \
     libboost-test-dev \
+    libboost-system-dev \
+    rapidjson-dev \
 
