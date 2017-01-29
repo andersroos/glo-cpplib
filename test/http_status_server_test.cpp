@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE(basic_server_test)
 {
    uint16_t var = 1;
    http_status_server server;
-   server.add(&var, "/val", {tag::LAST}, 0, "A value.");
+   server.add(&var, "/val", {tag::LAST, tag::COUNT}, 0, "A value.");
 
    std::thread t([&server](){ server.serve_once(10s); });
    
@@ -81,12 +81,23 @@ BOOST_AUTO_TEST_CASE(basic_server_test)
    
    BOOST_CHECK_EQUAL("HTTP/1.1 200 OK", response.status());
 
-   auto json = response.json();
+   const auto& json = response.json();
 
    // Check that the timestamp is at least remotely correct.
-   auto timestamp = json["timestamp"].GetDouble();
+   const auto& timestamp = json["timestamp"].GetDouble();
    BOOST_CHECK((2017. - 1970) * 365 * 24 * 3600 < timestamp);
    BOOST_CHECK(timestamp < (2018. - 1970) * 365 * 24 * 3600);
-   
+
+   BOOST_CHECK_EQUAL(4, json["version"].GetInt());
+
+   const auto& items = json["items"];
+
+   BOOST_CHECK_EQUAL(1, items.Size());
+
+   const auto& item = items[0];
+
+   BOOST_CHECK_EQUAL("/val:last-count", item["key"].GetString());
+   BOOST_CHECK_EQUAL(0, item["level"].GetInt());
+   BOOST_CHECK_EQUAL("A value.", item["desc"].GetString());
 }
 
