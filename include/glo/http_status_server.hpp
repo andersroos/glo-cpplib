@@ -3,7 +3,6 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <iostream>
 #include <memory>
@@ -17,6 +16,8 @@
 
 namespace glo {
 
+   using namespace std::literals::chrono_literals;
+   
    //
    // A class for servring status messages using a minimal HTTP (only 1.1 supported) server implementation (supports
    // only GET and will close the connection after every request). The server will return the same response for all
@@ -33,7 +34,7 @@ namespace glo {
    // a jsonp callback as application/javascript: by adding callback=<javascript function name> as a request parameter
    //
    struct http_status_server : public group
-   {
+   { 
       // Create the server, which is also a group. For parameters key_prefix and mutexe see group doc. Set the port the
       // server should listen to with port, 0 for the first available port from 22200 to 22240. Throws glo::os_error on
       // failed system calls or if no free port is found.
@@ -47,17 +48,23 @@ namespace glo {
       // Get the actual port used if not manually set, returns 0 if failed to bind on (any) port.
       inline uint16_t port();
       
-      // Serve one request and return or return after timeout seconds (0 for no timeout) or an unspecified time after
-      // stop is called. Throws glo::os_error on failed system calls.
-      inline void serve_once(double timeout=0); // TODO
+      // Serve one request and return or return after timeout (default 0) or an unspecified time
+      // after stop is called. Throws glo::os_error on failed system calls.
+      template<typename Rep, typename Period>
+      void serve_once(const std::chrono::duration<Rep, Period>& timeout);
+      void serve_once() { serve_once(std::chrono::seconds(0)); };
       
       // Serve requests forever. Only returning an unspecified time after stop is called. Sleep sleep_time seconds
       // between each request, this works as a throttling mechanism. Throws glo::os_error on failed system calls.
-      inline void serve_forever(double sleep_time=0.05);
+      template<typename Rep, typename Period>
+      void serve_forever(const std::chrono::duration<Rep, Period>& sleep_time);
+      void serve_forever() { serve_forever(50ms); };
       
       // Start a new thread responding to requests (calls serve_forever). The thread will be stopped and joined if stop
       // is called. Throws glo::os_error on failed system calls.
-      inline void start(double sleep_time=0.05);
+      template<typename Rep, typename Period>
+      void start(const std::chrono::duration<Rep, Period>& sleep_time);
+      void start() { start(50ms); };
       
       // Stop serving. If a thread was started with start it will block until the thread is stopped, otherwise it will
       // return immediately.
@@ -71,7 +78,9 @@ namespace glo {
 
       inline void bind();
       
-      inline void handle_request(int server, const useconds_t& poll_sleep_time_us, const std::chrono::seconds& max_time);
+      template<typename D1, typename D2>
+      void handle_request(int server, const D1& poll_sleep_time, const D2& max_time);
+         
       inline std::string do_http(std::stringstream& request);
 
       int _socket;
@@ -147,15 +156,13 @@ namespace glo {
       return _port;
    }
 
-   void http_status_server::serve_forever(double sleep_time)
+   template<typename Rep, typename Period>
+   void http_status_server::serve_forever(const std::chrono::duration<Rep, Period>& sleep_time)
    {
       int server = -1;
 
-      // Sleep time converted for use in usleep.
-      useconds_t sleep_time_us = sleep_time * 1e6;
-
       // Sleep time each time we get an egain from a syscall.
-      useconds_t poll_sleep_time_us = std::max<useconds_t>(sleep_time * 1e5, 200);
+      auto poll_sleep_time = std::max(200us, std::chrono::duration_cast<std::chrono::microseconds>(sleep_time) / 10);
 
       // If the connection is not completed within this time it will be closed.
       std::chrono::seconds request_max_time(2);
@@ -168,20 +175,20 @@ namespace glo {
          
          if (server == -1) {
             if (errno == EAGAIN) {
-               usleep(poll_sleep_time_us);
+               std::this_thread::sleep_for(poll_sleep_time);
                continue;
             }
             throw std::runtime_error("error accepting connection");
          }
          
-         handle_request(server, poll_sleep_time_us, request_max_time);
+         handle_request(server, poll_sleep_time, request_max_time);
          
-         usleep(sleep_time_us);
+         std::this_thread::sleep_for(sleep_time);
       }
    }
- 
-   void http_status_server::handle_request(int server, const useconds_t& poll_sleep_time_us,
-                                           const std::chrono::seconds& max_time)
+
+   template<typename D1, typename D2>
+   void http_status_server::handle_request(int server, const D1& poll_sleep_time, const D2& max_time)
    {
       char buf[2048];
       
@@ -201,7 +208,7 @@ namespace glo {
                   // Request max time reached.
                   return;
                }
-               usleep(poll_sleep_time_us);
+               std::this_thread::sleep_for(poll_sleep_time);
                continue;                     
             }
             // Failed to receive data, close connection.
@@ -229,7 +236,7 @@ namespace glo {
                   // Request max time reached.
                   return;
                }
-               usleep(poll_sleep_time_us);
+               std::this_thread::sleep_for(poll_sleep_time);
                continue;
             }
             // Failed to send data, close connection.
@@ -320,7 +327,8 @@ namespace glo {
       return response.str();
    }
    
-   void http_status_server::start(double sleep_time)
+   template<typename Rep, typename Period>
+   void http_status_server::start(const std::chrono::duration<Rep, Period>& sleep_time)
    {
       std::lock_guard<std::mutex> lock(_mutex);
       if (!_server_thread) {
