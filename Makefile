@@ -19,12 +19,13 @@ CXXFLAGS = -fPIC -g -O2 -DDEFAULT_DB=\"$(DEFAULT_DB)\" -I$(INCLUDE_DIR) -std=c++
 
 LIBS =
 
-TEST_LIBS = -lboost_unit_test_framework
+TEST_LIBS = -lboost_unit_test_framework -lpthread -lboost_system
 
 TEST_OBJS = \
 	test/run_tests.o \
 	test/group_format_lock_test.o \
-	test/group_format_test.o
+	test/group_format_test.o \
+	test/http_status_server_test.o
 
 
 default: examples test
