@@ -48,6 +48,9 @@ namespace glo {
       http_status_server(std::string key_prefix, std::shared_ptr<std::mutex> mutex, uint16_t port)
          : group(key_prefix, mutex), _port(port) { bind(); }
 
+      http_status_server(const http_status_server&) = delete;
+      http_status_server& operator=(const http_status_server&) = delete;
+      
       // Get the actual port used if not manually set, returns 0 if failed to bind on (any) port.
       inline uint16_t port();
       

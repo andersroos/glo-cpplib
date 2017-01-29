@@ -106,6 +106,8 @@ namespace glo {
    struct close_guard {
       int fd;
       close_guard(int fd) : fd(fd) {}
+      close_guard(const close_guard&) = delete;
+      close_guard& operator=(const close_guard&) = delete;
       ~close_guard() { if (fd != -1) close(fd); }
    };
    

@@ -24,6 +24,9 @@ namespace glo {
       group(const std::shared_ptr<std::mutex>& mutex) : _value_mutex(mutex) {};
       group(const std::string& key_prefix, const std::shared_ptr<std::mutex>& mutex) : _key_prefix(key_prefix), _value_mutex(mutex) {}
 
+      group(const group&) = delete;
+      group& operator=(const group&) = delete;
+      
       // TODO How JsonFormatter works is not optimal, maybe want to provide optional format function instead.
       
       // Add a value of type V to be returned by status call. Any types are accepted as long as there is a json
@@ -91,7 +94,10 @@ namespace glo {
    struct group::value
    {
       value(std::string item_spec) : item_spec(item_spec) {}
-      
+
+      value(const value&) = delete;
+      value& operator=(const value&) = delete;
+     
       virtual void locked_prepare() const {}
       
       virtual void json_format(std::ostream& os) const {}
@@ -106,6 +112,9 @@ namespace glo {
    struct group::object_value : public group::value
    {
       object_value(V val, std::string item_spec) : value(item_spec), _val(val) {}
+
+      object_value(const object_value&) = delete;
+      object_value& operator=(const object_value&) = delete;
       
       virtual void locked_prepare() const override
       {
@@ -134,6 +143,9 @@ namespace glo {
       : public group::value
    {
       object_value(V val, std::string item_spec) : value(item_spec), _val(val) {}
+
+      object_value(const object_value&) = delete;
+      object_value& operator=(const object_value&) = delete;
       
       virtual void locked_prepare() const override {
          _copy = *_val;
@@ -159,6 +171,9 @@ namespace glo {
    {
       object_value(V val, std::string item_spec) :
          value(item_spec), _val(val), _copy(std::make_shared<typename V::element_type>()) {}
+
+      object_value(const object_value&) = delete;
+      object_value& operator=(const object_value&) = delete;
       
       virtual void locked_prepare() const override
       {
@@ -185,6 +200,9 @@ namespace glo {
    {
       object_value(V val, std::string item_spec) :
          value(item_spec), _val(val), _copy(), _ref(_copy) {}
+
+      object_value(const object_value&) = delete;
+      object_value& operator=(const object_value&) = delete;
       
       virtual void locked_prepare() const override
       {
