@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <iostream>
 #include <memory>
@@ -51,11 +52,11 @@ namespace glo {
       inline void serve_once(double timeout=0); // TODO
       
       // Serve requests forever. Only returning an unspecified time after stop is called. Sleep sleep_time seconds
-      // between each request, this works as a throttling mecanism. Throws glo::os_error on failed system calls.
+      // between each request, this works as a throttling mechanism. Throws glo::os_error on failed system calls.
       inline void serve_forever(double sleep_time=0.05);
       
-      // Start a new thread responding to requests. The thread will be stopped and joined if stop is called. Throws
-      // glo::os_error on failed system calls.
+      // Start a new thread responding to requests (calls serve_forever). The thread will be stopped and joined if stop
+      // is called. Throws glo::os_error on failed system calls.
       inline void start(double sleep_time=0.05);
       
       // Stop serving. If a thread was started with start it will block until the thread is stopped, otherwise it will
@@ -70,6 +71,7 @@ namespace glo {
 
       inline void bind();
       
+      inline void handle_request(int server, const useconds_t& poll_sleep_time_us, const std::chrono::seconds& max_time);
       inline std::string do_http(std::stringstream& request);
 
       int _socket;
@@ -147,10 +149,17 @@ namespace glo {
 
    void http_status_server::serve_forever(double sleep_time)
    {
-      // TODO Implement read timeout and accept timeout.
-      char buf[2048];
       int server = -1;
 
+      // Sleep time converted for use in usleep.
+      useconds_t sleep_time_us = sleep_time * 1e6;
+
+      // Sleep time each time we get an egain from a syscall.
+      useconds_t poll_sleep_time_us = std::max<useconds_t>(sleep_time * 1e5, 200);
+
+      // If the connection is not completed within this time it will be closed.
+      std::chrono::seconds request_max_time(2);
+      
       while (true) {
          {
             std::lock_guard<std::mutex> lock(_mutex);
@@ -159,49 +168,78 @@ namespace glo {
          
          if (server == -1) {
             if (errno == EAGAIN) {
-               usleep(std::max<uint64_t>(200, sleep_time * 2e5));
+               usleep(poll_sleep_time_us);
                continue;
             }
             throw std::runtime_error("error accepting connection");
          }
-
-         {
-            close_guard server_close(server);
-
-            set_non_blocking(server);
-            
-            std::stringstream data;
-            ssize_t received;
-            while (true) {
-               received = recv(server, buf, sizeof(buf), 0);
-               if (received == -1) {
-                  if (errno == EAGAIN) {
-                     // TODO Close connection on timeout.
-                     usleep(std::max<uint64_t>(20, sleep_time * 2e5));
-                     continue;
-                  }
-                  // Failed to receive data, just ignore this error.
-                  break;
-               }
-               data.write(buf, received);
-               data.seekg(-4, data.end);
-               data.read(buf, 4);
-               if (strncmp("\r\n\r\n", buf, 4) == 0) {
-                  std::string response = do_http(data);
-                  
-                  if (send(server, response.c_str(), response.size(), 0) == -1) {
-                     // Failed to send data, just ignore this error.
-                  }
-                  break;
-               }
-            }
-         }
-
-         usleep(uint64_t(sleep_time * 1e6));
+         
+         handle_request(server, poll_sleep_time_us, request_max_time);
+         
+         usleep(sleep_time_us);
       }
    }
+ 
+   void http_status_server::handle_request(int server, const useconds_t& poll_sleep_time_us,
+                                           const std::chrono::seconds& max_time)
+   {
+      char buf[2048];
+      
+      close_guard server_close(server);
+  
+      auto start_time = std::chrono::high_resolution_clock::now();
+            
+      set_non_blocking(server);
 
-   inline std::string error_response(std::string message)
+      // Read request.
+      std::stringstream data;
+      while (true) {
+         auto received = recv(server, buf, sizeof(buf), 0);
+         if (received == -1) {
+            if (errno == EAGAIN) {
+               if (std::chrono::high_resolution_clock::now() - start_time > max_time) {
+                  // Request max time reached.
+                  return;
+               }
+               usleep(poll_sleep_time_us);
+               continue;                     
+            }
+            // Failed to receive data, close connection.
+            return; 
+
+         }
+         data.write(buf, received);
+         data.seekg(-4, data.end);
+         data.read(buf, 4);
+         if (strncmp("\r\n\r\n", buf, 4) == 0) {
+            // We have end of http request, read is complete.
+            break;
+         }
+      }
+
+      // Parse and create response.
+      std::string response = do_http(data);
+
+      // Send response.
+      while (response.size()) {
+         auto sent = send(server, response.c_str(), response.size(), 0);
+         if (sent == -1) {
+            if (errno == EAGAIN) {
+               if (std::chrono::high_resolution_clock::now() - start_time > max_time) {
+                  // Request max time reached.
+                  return;
+               }
+               usleep(poll_sleep_time_us);
+               continue;
+            }
+            // Failed to send data, close connection.
+            return; 
+         }
+         response.erase(0, sent);
+      }
+   }
+     
+   inline std::string error_response(const std::string& message)
    {
       return "HTTP/1.1 400 " + message + "\r\n\r\n";
    }
