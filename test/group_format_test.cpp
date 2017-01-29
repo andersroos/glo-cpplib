@@ -127,3 +127,38 @@ BOOST_AUTO_TEST_CASE(test_format_shared_ptr_to_updating_int8)
       BOOST_CHECK_EQUAL(R""({"key":"shared:count","level":0,"desc":"Shared.","value":123})"", ss.str());
    }
 }
+
+BOOST_AUTO_TEST_CASE(test_format_json_escaping)
+{
+   BOOST_CHECK_EQUAL("abc", escape_json("abc"));
+   BOOST_CHECK_EQUAL("\\u0022", escape_json("\""));
+   BOOST_CHECK_EQUAL("\\u000a", escape_json("\n"));
+   BOOST_CHECK_EQUAL("ä", escape_json("ä"));
+}
+
+BOOST_AUTO_TEST_CASE(test_json_format)
+{
+   {
+      stringstream ss;
+      json_format(ss, "abc"s);
+      BOOST_CHECK_EQUAL("\"abc\"", ss.str());
+   }
+
+   {
+      stringstream ss;
+      json_format(ss, "abc");
+      BOOST_CHECK_EQUAL("\"abc\"", ss.str());
+   }
+
+   {
+      stringstream ss;
+      json_format(ss, 'a');
+      BOOST_CHECK_EQUAL("\"a\"", ss.str());
+   }
+
+   {
+      stringstream ss;
+      json_format(ss, false);
+      BOOST_CHECK_EQUAL("false", ss.str());
+   }
+}
