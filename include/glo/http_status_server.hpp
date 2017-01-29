@@ -14,9 +14,6 @@
 #include <glo/common.hpp>
 
 
-// TODO Make sure all classes follows the rule of three/five/zero.
-
-
 namespace glo {
 
    using namespace std::literals::chrono_literals;
