@@ -34,7 +34,7 @@ namespace glo {
    // a jsonp callback as application/javascript: by adding callback=<javascript function name> as a request parameter
    //
    struct http_status_server : public group
-   { 
+   {
       // Create the server, which is also a group. For parameters key_prefix and mutexe see group doc. Set the port the
       // server should listen to with port, 0 for the first available port from 22200 to 22240. Throws glo::os_error on
       // failed system calls or if no free port is found.
@@ -48,11 +48,12 @@ namespace glo {
       // Get the actual port used if not manually set, returns 0 if failed to bind on (any) port.
       inline uint16_t port();
       
-      // Serve one request and return or return after timeout (default 0) or an unspecified time
-      // after stop is called. Throws glo::os_error on failed system calls.
+      // Serves one request and returns or returns if no one connected after about timeout time has passed or returns an
+      // unspecified time after stop is called. Throws glo::os_error on failed system calls. Returns false is there was
+      // a timeout and true otherwise, note that false does not mean that a request was fully completed.
       template<typename Rep, typename Period>
-      void serve_once(const std::chrono::duration<Rep, Period>& timeout);
-      void serve_once() { serve_once(std::chrono::seconds(0)); };
+      bool serve_once(const std::chrono::duration<Rep, Period>& timeout);
+      bool serve_once() { return serve_once(std::chrono::seconds(0)); };
       
       // Serve requests forever. Only returning an unspecified time after stop is called. Sleep sleep_time seconds
       // between each request, this works as a throttling mechanism. Throws glo::os_error on failed system calls.
@@ -77,21 +78,30 @@ namespace glo {
    private:
 
       inline void bind();
+
+      inline bool internal_serve_once(const std::chrono::microseconds& accept_timeout,
+                                      const std::chrono::microseconds& poll_wait);
       
-      template<typename D1, typename D2>
-      void handle_request(int server, const D1& poll_sleep_time, const D2& max_time);
+      inline void handle_request(int server, const std::chrono::microseconds& poll_wait);
          
       inline std::string do_http(std::stringstream& request);
 
       int _socket;
       uint16_t _port;
       std::unique_ptr<std::thread> _server_thread;
+
    };
 
    //
    // Implementation.
    //
 
+   // If a request is not completed completed within this time it will be closed.
+   constexpr auto REQUEST_MAX_TIME = 2s;
+      
+   // Min time to wait between polling.
+   constexpr auto MIN_POLL_WAIT = 200us;
+   
    inline void set_non_blocking(int sock)
    {
       int val = fcntl(sock, F_GETFL, 0);
@@ -159,42 +169,58 @@ namespace glo {
    template<typename Rep, typename Period>
    void http_status_server::serve_forever(const std::chrono::duration<Rep, Period>& sleep_time)
    {
-      int server = -1;
-
-      // Sleep time each time we get an egain from a syscall.
-      auto poll_sleep_time = std::max(200us, std::chrono::duration_cast<std::chrono::microseconds>(sleep_time) / 10);
-
-      // If the connection is not completed within this time it will be closed.
-      std::chrono::seconds request_max_time(2);
+      auto poll_wait = std::max(MIN_POLL_WAIT, std::chrono::duration_cast<std::chrono::microseconds>(sleep_time) / 10);
+      auto accept_timeout = 24h;
       
       while (true) {
-         {
-            std::lock_guard<std::mutex> lock(_mutex);
-            server = accept(_socket, NULL, NULL);
+         if (internal_serve_once(accept_timeout, poll_wait)) {
+            std::this_thread::sleep_for(sleep_time);
          }
-         
-         if (server == -1) {
-            if (errno == EAGAIN) {
-               std::this_thread::sleep_for(poll_sleep_time);
-               continue;
-            }
-            throw std::runtime_error("error accepting connection");
-         }
-         
-         handle_request(server, poll_sleep_time, request_max_time);
-         
-         std::this_thread::sleep_for(sleep_time);
       }
    }
 
-   template<typename D1, typename D2>
-   void http_status_server::handle_request(int server, const D1& poll_sleep_time, const D2& max_time)
+   template<typename Rep, typename Period>
+   bool http_status_server::serve_once(const std::chrono::duration<Rep, Period>& timeout)
+   {
+      return internal_serve_once(std::chrono::duration_cast<std::chrono::microseconds>(timeout), MIN_POLL_WAIT);
+   }
+
+   bool http_status_server::internal_serve_once(const std::chrono::microseconds& accept_timeout,
+                                                const std::chrono::microseconds& poll_wait)
+   {
+      auto accept_timeout_time = std::chrono::high_resolution_clock::now() + accept_timeout;
+
+      int server = -1;
+      while (true) {
+         server = accept(_socket, NULL, NULL);
+
+         if (server != -1) {
+            break;
+         }
+         
+         if (errno == EAGAIN) {
+            if (std::chrono::high_resolution_clock::now() > accept_timeout_time) {
+               return false;
+            }
+            std::this_thread::sleep_for(poll_wait);
+            continue;
+         }
+         
+         throw std::runtime_error("error accepting connection");
+      }
+         
+      handle_request(server, poll_wait);
+         
+      return true;
+   }
+   
+   void http_status_server::handle_request(int server, const std::chrono::microseconds& poll_wait)
    {
       char buf[2048];
       
       close_guard server_close(server);
   
-      auto start_time = std::chrono::high_resolution_clock::now();
+      auto request_timeout_time = std::chrono::high_resolution_clock::now() + REQUEST_MAX_TIME;
             
       set_non_blocking(server);
 
@@ -204,11 +230,11 @@ namespace glo {
          auto received = recv(server, buf, sizeof(buf), 0);
          if (received == -1) {
             if (errno == EAGAIN) {
-               if (std::chrono::high_resolution_clock::now() - start_time > max_time) {
+               if (std::chrono::high_resolution_clock::now() > request_timeout_time) {
                   // Request max time reached.
                   return;
                }
-               std::this_thread::sleep_for(poll_sleep_time);
+               std::this_thread::sleep_for(poll_wait);
                continue;                     
             }
             // Failed to receive data, close connection.
@@ -232,11 +258,11 @@ namespace glo {
          auto sent = send(server, response.c_str(), response.size(), 0);
          if (sent == -1) {
             if (errno == EAGAIN) {
-               if (std::chrono::high_resolution_clock::now() - start_time > max_time) {
+               if (std::chrono::high_resolution_clock::now() > request_timeout_time) {
                   // Request max time reached.
                   return;
                }
-               std::this_thread::sleep_for(poll_sleep_time);
+               std::this_thread::sleep_for(poll_wait);
                continue;
             }
             // Failed to send data, close connection.
@@ -245,7 +271,7 @@ namespace glo {
          response.erase(0, sent);
       }
    }
-     
+
    inline std::string error_response(const std::string& message)
    {
       return "HTTP/1.1 400 " + message + "\r\n\r\n";
