@@ -79,6 +79,7 @@ namespace glo {
       std::vector<std::pair<std::string, std::shared_ptr<group>>> _groups;
 
    protected:
+      
       // Mutex for internal data structures.
       std::mutex _mutex;
    };
