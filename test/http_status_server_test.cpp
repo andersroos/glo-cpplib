@@ -67,18 +67,20 @@ http_response request(uint16_t port, std::string data)
 }
 
 
-BOOST_AUTO_TEST_CASE(basic_server_test)
+BOOST_AUTO_TEST_CASE(basic_serve_once_test)
 {
    uint16_t var = 1;
    http_status_server server;
    server.add(&var, "/val", {tag::LAST, tag::COUNT}, 0, "A value.");
+   atomic<bool> serve_once_response;
 
-   std::thread t([&server](){ server.serve_once(10s); });
+   std::thread t([&server,&serve_once_response ](){ serve_once_response = server.serve_once(10s); });
    
    auto response = request(server.port(), "GET / HTTP/1.1\r\n\r\n");
 
    t.join();   
    
+   BOOST_CHECK(serve_once_response);
    BOOST_CHECK_EQUAL("HTTP/1.1 200 OK", response.status());
 
    const auto& json = response.json();
@@ -99,5 +101,14 @@ BOOST_AUTO_TEST_CASE(basic_server_test)
    BOOST_CHECK_EQUAL("/val:last-count", item["key"].GetString());
    BOOST_CHECK_EQUAL(0, item["level"].GetInt());
    BOOST_CHECK_EQUAL("A value.", item["desc"].GetString());
+}
+
+BOOST_AUTO_TEST_CASE(test_serve_once_timeouts_on_no_request)
+{
+   http_status_server server;
+   auto before = std::chrono::high_resolution_clock::now();
+   BOOST_CHECK(not server.serve_once(10us));
+   auto duration = std::chrono::high_resolution_clock::now() - before;
+   BOOST_CHECK(duration > 5us);
 }
 

@@ -54,7 +54,7 @@ namespace glo {
       // Serves one request and returns or returns if no one connected after about timeout time has passed or returns an
       // unspecified time after stop is called. Throws glo::os_error on failed system calls. Returns false is there was
       // a timeout or if stop was called and true otherwise, note that true does not mean that a request was fully
-      // completed.
+      // completed if request max time was reached before completing it will return true.
       template<typename Rep, typename Period>
       bool serve_once(const std::chrono::duration<Rep, Period>& timeout);
       bool serve_once() { return serve_once(std::chrono::seconds(0)); };
