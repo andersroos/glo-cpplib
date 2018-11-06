@@ -66,7 +66,8 @@ namespace glo {
       void serve_forever() { serve_forever(50ms); };
       
       // Start a new thread responding to requests (calls serve_forever). The thread will be stopped and joined if stop
-      // is called. Throws glo::os_error on failed system calls.
+      // is called. If a non stopped server is destructed the process will terminate. Throws glo::os_error on failed
+      // system calls.
       template<typename Rep, typename Period>
       void start(const std::chrono::duration<Rep, Period>& sleep_time);
       void start() { start(50ms); };
